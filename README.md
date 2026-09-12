@@ -1,121 +1,95 @@
+# RL Planning Algorithms — 2×2 FrozenLake
 
-# Policy Iteration on a 2×2 FrozenLake
+Two classical **planning** algorithms from reinforcement learning,
+implemented from scratch with only Python + NumPy. No Gym, no Gymnasium.
 
-A minimal, dependency-light implementation of **policy iteration** — one
-of the classical *planning* algorithms of reinforcement learning —
-applied to a hand-coded 2×2 FrozenLake grid.
-No Gym, no Gymnasium. Only Python + NumPy.
+Each algorithm lives on its own branch and has its own README:
 
-> Companion branch: `value-iteration` for the other classical planner.
-
----
-
-## Why "planning", not "learning"?
-
-In reinforcement learning, **planning** assumes you already have a perfect
-model of the environment (`R(s, a, s')` and `T(s, a) → s'`). Given the
-model, you can compute the optimal value function and policy **without
-interacting with the environment**.
-
-That is different from **learning**, where the model is unknown and the
-values have to be estimated from sampled experience (Q-learning, SARSA,
-PPO…). This repo sits firmly on the planning side.
+| Algorithm         | Branch             | File                  |
+|-------------------|--------------------|-----------------------|
+| Value Iteration   | `value-iteration`  | `valueIteration.py`   |
+| Policy Iteration  | `policy-iteration` | `policyIteration.py`  |
 
 ---
 
-## Environment
+## What's the difference?
+
+**Value iteration** directly applies the Bellman *optimality* operator:
+V_{k+1}(s) = max_a [ R(s, a, s') + γ · V_k(s') ]
+
+
+sweeping every state until `V` stops changing. The optimal policy is then
+read off greedily: `π(s) = argmax_a Q(s, a)`.
+
+**Policy iteration** is not a direct solver of the Bellman optimality
+equation. Instead it alternates between two steps:
+
+1. **Policy evaluation** — solve `v_π = r_π + γ·P_π·v_π` for the current
+   policy `π`.
+2. **Policy improvement** — `π' = argmax_π ( r_π + γ·P_π·v_π )`.
+
+Both algorithms converge to the same optimal value function and policy.
+Value iteration does **one** Bellman-optimality update per sweep; policy
+iteration does **many** Bellman-expectation updates (the inner evaluation)
+plus **one** greedy update. The idea behind policy iteration is widely
+used in modern RL.
+
+---
+
+## Environment (shared by both branches)
+
+Hand-coded 2×2 FrozenLake:
 s1 | s2 Actions: 1 = Up 2 = Right
 ----+---- 3 = Down 4 = Left 5 = Stay
 s3 | s4
 
 
 
-- `s2` is a pit (reward −1)
-- `s4` is the goal (reward +1)
-- any invalid move (bumping into a wall) gives −1
-- "stay" (action 5) gives 0 unless it lands on the goal or pit
+- `s2` = pit (reward −1)
+- `s4` = goal (reward +1)
+- invalid move (bumping a wall) = −1
+- `γ = 0.9`
+
+Same reward and transition functions in both branches.
 
 ---
 
-## Algorithm
+## Results (identical optimum, as expected)
 
-This section presents another important algorithm: **policy iteration**.
-Unlike value iteration, policy iteration is *not* for directly solving
-the Bellman optimality equation. However, it has an intimate relationship
-with value iteration, and the idea behind it is widely used in modern
-reinforcement learning algorithms.
+| State | Value |
+|-------|-------|
+| `s1`  | 9     |
+| `s2`  | 10    |
+| `s3`  | 10    |
+| `s4`  | 10    |
 
-Policy iteration is an iterative algorithm. Each iteration has two steps:
-
-1. **Policy evaluation.** Given a policy `π_k`, compute its state value
-   `v_{π_k}` by solving the Bellman equation:
-        v_{π_k} = r_{π_k} + γ · P_{π_k} · v_{π_k}
-
-where `r_{π_k}` and `P_{π_k}` come from the system model.
-
-2. **Policy improvement.** Using `v_{π_k}`, produce a new, better policy:
-        π_{k+1} = arg max_π ( r_π + γ · P_π · v_{π_k} )
-
-Repeat until the value (or the policy) stops changing.
-
-### Elementwise form
-
-**Policy evaluation** solves `v_{π_k} = r_{π_k} + γ·P_{π_k}·v_{π_k}`
-iteratively, one state at a time:
-
-v_{π_k}^{(j+1)}(s) = Σ_a π_k(a|s) ·
-[ Σ_r p(r|s,a)·r
-
-    γ · Σ_{s'} p(s'|s,a) · v_{π_k}^{(j)}(s') ]
-    for all s ∈ S, j = 0, 1, 2, ...
+Optimal policy:
+s1 ↓ s2 ↓
+s3 → s4 →
 
 
+Number of iterations:
 
-**Policy improvement** computes, for each state,
-π_{k+1}(s) = arg max_π Σ_a π(a|s) ·
-( Σ_r p(r|s,a)·r + γ · Σ_{s'} p(s'|s,a) · v_{π_k}(s') )
-└──────────────── q_{π_k}(s, a) ────────────────┘
-
-
-Let `a*_k(s) = arg max_a q_{π_k}(s, a)`. Then the greedy policy is
-π_{k+1}(a|s) = 1 if a == a*_k(s),
-0 otherwise
-
-
-### Connection to value iteration
-
-Value iteration performs **one Bellman-optimality update per sweep**.
-Policy iteration performs **many Bellman-expectation updates** (policy
-evaluation) followed by **one greedy update** (policy improvement). Both
-converge to the same optimal value function and policy — policy iteration
-often in far fewer outer iterations, at the cost of the inner evaluation
-loop.
+- Value iteration: ~170–330 outer sweeps (depends on the convergence
+  threshold).
+- Policy iteration: 3 outer iterations, each with ~880 inner evaluation
+  sweeps.
 
 ---
 
-## Results
-
-With `γ = 0.9` and initial guess `π_0 = {stay everywhere, up in s4}`:
-
-- Policy evaluation converges in ~880 inner sweeps per round.
-- **Policy iteration converges in 3 outer iterations.**
-- Final values: `s1 = 9, s2 = 10, s3 = 10, s4 = 10` — the same as
-  value iteration, as expected.
-
-
-Optimal Policy
-s1 → Down
-s2 → Down
-s3 → Right
-s4 → Right
-
-
----
-
-## Run it
+## How to use this repo
 
 ```bash
+# clone
+git clone git@github.com:<USERNAME>/<REPO>.git
+cd <REPO>
+
+# run value iteration
+git checkout value-iteration
+python valueIteration.py
+
+# run policy iteration
+git checkout policy-iteration
 python policyIteration.py
 
-Requires only Python 3.8+ and NumPy.
-
+Requirements: Python 3.8+ and NumPy.
